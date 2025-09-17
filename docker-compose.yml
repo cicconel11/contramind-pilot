@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cm-postgres
+    environment:
+      POSTGRES_USER: cm
+      POSTGRES_PASSWORD: cm
+      POSTGRES_DB: cm
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+
+  worldcheck:
+    build: ./services/worldcheck
+    container_name: cm-worldcheck
+    environment:
+      WC_LATENCY_MAX_MS: "1500"
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+
+  attestor:
+    build: ./services/attestor
+    container_name: cm-attestor
+    environment:
+      ATTESTOR_SEED: "demo-seed-change-me"
+    ports:
+      - "8082:8080"
+
+  client:
+    build: ./services/client
+    container_name: cm-client
+    depends_on:
+      - postgres
+      - attestor
+    environment:
+      PGHOST: postgres
+      PGUSER: cm
+      PGPASSWORD: cm
+      PGDATABASE: cm
+      PGPORT: "5432"
+      ATTESTOR_URL: "http://attestor:8080"
+      WORLDCHECK_URL: "http://worldcheck:8080"
+    command: ["python", "demo.py"]
+
+  control:
+    build: ./services/control
+    container_name: cm-control
+    environment:
+      ADMIN_TOKEN: "changeme"
+      PGHOST: postgres
+      PGUSER: cm
+      PGPASSWORD: cm
+      PGDATABASE: cm
+      PGPORT: "5432"
+    ports:
+      - "8083:8080"
+    depends_on:
+      - postgres
