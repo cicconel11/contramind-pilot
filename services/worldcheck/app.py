@@ -1,8 +1,10 @@
 import os, random, time
 from fastapi import FastAPI
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(title="WorldCheck", version="0.1.0")
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 LAT_MAX_MS = int(os.getenv("WC_LATENCY_MAX_MS", "1500"))
 
 class VerifyReq(BaseModel):

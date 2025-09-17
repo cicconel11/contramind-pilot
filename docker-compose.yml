@@ -20,14 +20,25 @@ services:
       - "8081:8080"
     depends_on:
       - postgres
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/metrics"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   attestor:
     build: ./services/attestor
     container_name: cm-attestor
     environment:
-      ATTESTOR_SEED: "demo-seed-change-me"
+      ATTESTOR_KEYS: "ed25519:v1:demo-seed-change-me;ed25519:v2:next-rotating-seed"
+      ATTESTOR_ACTIVE_KID: "ed25519:v1"
     ports:
       - "8082:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/metrics"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   client:
     build: ./services/client
@@ -59,3 +70,31 @@ services:
       - "8083:8080"
     depends_on:
       - postgres
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus
+    container_name: cm-prometheus
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - worldcheck
+      - attestor
+      - control
+
+  grafana:
+    image: grafana/grafana
+    container_name: cm-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    depends_on:
+      - prometheus

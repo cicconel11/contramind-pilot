@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 import psycopg
+from prometheus_fastapi_instrumentator import Instrumentator
 
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "changeme")
 
@@ -23,6 +24,7 @@ def q(sql, args=()):
             return rows
 
 app = FastAPI(title="Control Plane Lite", version="0.1.0")
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 @app.get("/param/hash")
 def param_hash(auth: str|None = Header(None, alias="Authorization")):

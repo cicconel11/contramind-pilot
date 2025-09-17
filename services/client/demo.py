@@ -1,5 +1,5 @@
 import os, json, time, requests, hashlib
-import psycopg
+from psycopg_pool import ConnectionPool
 
 PGHOST = os.getenv("PGHOST", "localhost")
 PGUSER = os.getenv("PGUSER", "cm")
