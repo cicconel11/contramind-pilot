@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
-import psycopg
+from psycopg_pool import ConnectionPool
 from prometheus_fastapi_instrumentator import Instrumentator
 
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "changeme")
@@ -10,12 +10,15 @@ PGHOST=os.getenv("PGHOST","postgres"); PGUSER=os.getenv("PGUSER","cm")
 PGPASSWORD=os.getenv("PGPASSWORD","cm"); PGDATABASE=os.getenv("PGDATABASE","cm")
 PGPORT=int(os.getenv("PGPORT","5432"))
 
+POOL = ConnectionPool(conninfo=f"host={PGHOST} port={PGPORT} dbname={PGDATABASE} user={PGUSER} password={PGPASSWORD}",
+                      min_size=1, max_size=5, timeout=5)
+
 def check(auth: str|None):
     if auth != f"Bearer {ADMIN_TOKEN}":
         raise HTTPException(status_code=401, detail="unauthorized")
 
 def q(sql, args=()):
-    with psycopg.connect(host=PGHOST, port=PGPORT, user=PGUSER, password=PGPASSWORD, dbname=PGDATABASE) as c:
+    with POOL.connection() as c:
         with c.cursor() as cur:
             cur.execute(sql, args)
             try: rows = cur.fetchall()
@@ -31,6 +34,18 @@ def param_hash(auth: str|None = Header(None, alias="Authorization")):
     check(auth)
     h = q("SELECT param_hash FROM cm.param_hash_view")[0][0]
     return {"param_hash": h}
+
+@app.get("/params")
+def get_params(auth: str|None = Header(None, alias="Authorization")):
+    check(auth)
+    thresholds = q("SELECT k, v FROM cm.params_thresholds")
+    allowlist = q("SELECT country FROM cm.params_allowlist")
+    param_hash = q("SELECT param_hash FROM cm.param_hash_view")[0][0]
+    return {
+        "param_hash": param_hash,
+        "thresholds": {k: v for k, v in thresholds},
+        "allowlist": [c[0] for c in allowlist]
+    }
 
 class ThresholdReq(BaseModel):
     k: str = "amount_max"

@@ -98,3 +98,17 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     depends_on:
       - prometheus
+
+  anchor:
+    build: ./services/anchor
+    container_name: cm-anchor
+    depends_on:
+      - postgres
+      - attestor
+    environment:
+      PGHOST: postgres
+      PGUSER: cm
+      PGPASSWORD: cm
+      PGDATABASE: cm
+      PGPORT: "5432"
+      ATTESTOR_URL: "http://attestor:8080"
