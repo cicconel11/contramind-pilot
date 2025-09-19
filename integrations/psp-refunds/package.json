@@ -1,0 +1,33 @@
+{
+    "name": "@contramind/psp-refunds",
+    "version": "1.0.0",
+    "description": "Contramind PSP refund integrations with decision certificates",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "test": "node test-all.js",
+        "verify": "node verify-cert.js"
+    },
+    "dependencies": {
+        "stripe": "^14.0.0",
+        "braintree": "^3.0.0",
+        "node-fetch": "^3.3.0",
+        "jose": "^5.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0"
+    },
+    "keywords": [
+        "contramind",
+        "payments",
+        "refunds",
+        "stripe",
+        "adyen",
+        "braintree",
+        "shopify",
+        "jws",
+        "verification"
+    ],
+    "author": "Contramind",
+    "license": "MIT"
+}

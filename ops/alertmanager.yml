@@ -1,0 +1,29 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@contramind.local'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+
+receivers:
+- name: 'web.hook'
+  webhook_configs:
+  - url: 'http://localhost:5001/'
+    send_resolved: true
+
+# For production, replace with actual notification channels:
+# - name: 'slack'
+#   slack_configs:
+#   - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+#     channel: '#alerts'
+#     title: 'Contramind Alert'
+#     text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+#
+# - name: 'pagerduty'
+#   pagerduty_configs:
+#   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+#     description: '{{ .GroupLabels.alertname }}'

@@ -1,0 +1,279 @@
+openapi: 3.0.3
+info:
+  title: Contramind Decision API
+  description: |
+    Contramind Decision API provides automated decision making with cryptographic proof of authenticity.
+    
+    ## Features
+    
+    - **Automated Decision Making**: Get instant decisions for transactions, refunds, and other business processes
+    - **JWS Certificates**: Cryptographically signed decision certificates for offline verification
+    - **Idempotency**: Prevent duplicate processing with configurable idempotency keys
+    - **Audit Trail**: Complete decision history with tamper-evident proof IDs
+    - **Key Rotation**: Support for multiple signing keys with automatic rotation
+    
+    ## Decision Certificate
+    
+    All decisions include a JWS (JSON Web Signature) certificate that can be verified offline:
+    
+    - **Algorithm**: EdDSA (Ed25519)
+    - **Format**: JWS Compact Serialization
+    - **Verification**: Use the `/keys` endpoint to get public keys
+    
+    ## Security
+    
+    - All decisions are cryptographically signed
+    - Certificates can be verified offline
+    - Tamper-evident proof IDs prevent certificate modification
+    - Idempotency keys prevent duplicate processing
+    
+  version: 1.0.0
+  contact:
+    name: Contramind Support
+    url: https://contramind.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8084
+    description: Development server
+  - url: https://api.contramind.com
+    description: Production server
+
+paths:
+  /decide:
+    post:
+      summary: Make a decision
+      description: |
+        Make an automated decision with cryptographic proof of authenticity.
+        
+        The decision process:
+        1. Validate inputs and check idempotency cache
+        2. Run decision kernel logic
+        3. Query external services if needed (e.g., WorldCheck)
+        4. Generate decision certificate (JWS)
+        5. Store decision in ledger
+        6. Return decision with certificate
+        
+        **Idempotency**: Use the `Idempotency-Key` header to prevent duplicate processing.
+        If a decision with the same key exists, the cached result is returned.
+      operationId: decide
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: |
+            Idempotency key to prevent duplicate processing. If not provided, 
+            an auto-generated key is used based on the request content.
+          required: false
+          schema:
+            type: string
+            example: "order-12345-refund"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideRequest'
+            examples:
+              refund_request:
+                summary: Refund decision request
+                value:
+                  amount: 1500.0
+                  country: "US"
+                  ts: "2025-09-16T12:00:00Z"
+                  recent: 2
+                  context_id: "stripe_refund:cus_1234567890"
+              charge_request:
+                summary: Charge decision request
+                value:
+                  amount: 2500.0
+                  country: "CA"
+                  ts: "2025-09-16T12:00:00Z"
+                  recent: 1
+                  context_id: "stripe_charge:cus_1234567890"
+      responses:
+        '200':
+          description: Decision made successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecideResponse'
+              examples:
+                pass_decision:
+                  summary: Approved decision
+                  value:
+                    decision: "PASS"
+                    obligations: ["privacy_ok", "budget_ok"]
+                    kernel_id: "K_demo_v1_2750_allowlist"
+                    param_hash: "c058c1aa59bacd6e6bbf8030e1fb57e2"
+                    kid: "v1"
+                    signature_b64: "KvbqCuhwz+mW3qFmi+GN9wWcVzOTVyIjNYIfQ6yfxbPiywV7gP6g8d65gVnOkf9CZ5zxeRkQ2LiMDs2H8FaVAA=="
+                    proof_id: "7d33f562e9b8d455ab0d3eb1c2845242d7ab26cea387f46fc00eb86b07d979a9"
+                    anchor: null
+                    certificate_jws: "eyJhbGciOiJFZERTQSIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJkZWNpc2lvbiI6IlBBU1MiLCJpbnB1dHMiOnsiYW1vdW50IjoxNTAwLjAsImNvdW50cnkiOiJVUyIsInJlY2VudCI6Mn0sImtlcm5lbF9pZCI6IktfZGVtb192MV8yNzUwX2FsbG93bGlzdCIsIm9ibGlnYXRpb25zIjpbInByaXZhY3lfb2siLCJidWRnZXRfb2siXSwicGFyYW1faGFzaCI6ImMwNThjMWFhNTliYWNkNmU2YmJmODAzMGUxZmI1N2UyIiwicHJvb2ZfaWQiOiI3ZDMzZjU2MmU5YjhkNDU1YWIwZDNlYjFjMjg0NTI0MmQ3YWIyNmNlYTM4N2Y0NmZjMDBlYjg2YjA3ZDk3OWE5Iiwic3ViIjoiZGVjaXNpb24iLCJ0cyI6IjIwMjUtMDktMTdUMDQ6MTM6MzguMjEyNTc1WiJ9.C7vdoc0s-sJbeBa3dYDr8HxLH01IJjE9Gpbut5mm5lU4VCdZ-6vG9KefpNxBPpeRPTQ5--7CK01uimviwxctDQ"
+                hold_decision:
+                  summary: Manual review required
+                  value:
+                    decision: "HOLD_HUMAN"
+                    obligations: ["worldcheck_queried"]
+                    kernel_id: "K_demo_v1_2750_allowlist"
+                    param_hash: "c058c1aa59bacd6e6bbf8030e1fb57e2"
+                    kid: "v1"
+                    signature_b64: "KvbqCuhwz+mW3qFmi+GN9wWcVzOTVyIjNYIfQ6yfxbPiywV7gP6g8d65gVnOkf9CZ5zxeRkQ2LiMDs2H8FaVAA=="
+                    proof_id: "7d33f562e9b8d455ab0d3eb1c2845242d7ab26cea387f46fc00eb86b07d979a9"
+                    anchor: null
+                    certificate_jws: "eyJhbGciOiJFZERTQSIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJkZWNpc2lvbiI6IkhPTERfSFVNQU4iLCJpbnB1dHMiOnsiYW1vdW50IjoxNTAwLjAsImNvdW50cnkiOiJVUyIsInJlY2VudCI6Mn0sImtlcm5lbF9pZCI6IktfZGVtb192MV8yNzUwX2FsbG93bGlzdCIsIm9ibGlnYXRpb25zIjpbIndvcmxkY2hlY2tfcXVlcmllZCJdLCJwYXJhbV9oYXNoIjoiYzA1OGMxYWE1OWJhY2Q2ZTZiYmY4MDMwZTFmYjU3ZTIiLCJwcm9vZl9pZCI6IjdkMzNmNTYyZTliOGQ0NTVhYjBkM2ViMWMyODQ1MjQyZDdhYjI2Y2VhMzg3ZjQ2ZmMwMGViODZiMDdkOTc5YTkiLCJzdWIiOiJkZWNpc2lvbiIsInRzIjoiMjAyNS0wOS0xN1QwNDoxMzozOC4yMTI1NzVaIiwiZGVjaXNpb24iOiJIT0xEX0hVTUFOIn0.example_signature"
+        '400':
+          description: Bad request - invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /healthz:
+    get:
+      summary: Health check
+      description: Check if the service is healthy
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+components:
+  schemas:
+    DecideRequest:
+      type: object
+      required:
+        - amount
+        - country
+        - ts
+      properties:
+        amount:
+          type: number
+          format: float
+          description: Transaction amount
+          example: 1500.0
+          minimum: 0
+        country:
+          type: string
+          description: ISO country code
+          example: "US"
+          pattern: "^[A-Z]{2}$"
+        ts:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+          example: "2025-09-16T12:00:00Z"
+        recent:
+          type: integer
+          description: Number of recent transactions
+          example: 2
+          minimum: 0
+          default: 0
+        context_id:
+          type: string
+          description: Context identifier for tracking
+          example: "stripe_refund:cus_1234567890"
+
+    DecideResponse:
+      type: object
+      required:
+        - decision
+        - obligations
+        - kernel_id
+        - param_hash
+        - kid
+        - signature_b64
+        - proof_id
+        - certificate_jws
+      properties:
+        decision:
+          type: string
+          enum: [PASS, HOLD_HUMAN, REJECT, NEED_ONE_BIT]
+          description: |
+            Decision outcome:
+            - `PASS`: Transaction approved
+            - `HOLD_HUMAN`: Requires manual review
+            - `REJECT`: Transaction rejected
+            - `NEED_ONE_BIT`: Requires additional verification
+          example: "PASS"
+        obligations:
+          type: array
+          items:
+            type: string
+          description: List of obligations/requirements met
+          example: ["privacy_ok", "budget_ok"]
+        kernel_id:
+          type: string
+          description: Identifier of the decision kernel used
+          example: "K_demo_v1_2750_allowlist"
+        param_hash:
+          type: string
+          description: SHA-256 hash of parameters used in decision
+          example: "c058c1aa59bacd6e6bbf8030e1fb57e2"
+        kid:
+          type: string
+          description: Key identifier used for signing
+          example: "v1"
+        signature_b64:
+          type: string
+          description: Base64-encoded Ed25519 signature
+          example: "KvbqCuhwz+mW3qFmi+GN9wWcVzOTVyIjNYIfQ6yfxbPiywV7gP6g8d65gVnOkf9CZ5zxeRkQ2LiMDs2H8FaVAA=="
+        proof_id:
+          type: string
+          description: SHA-256 hash of canonical decision + signature (tamper evidence)
+          example: "7d33f562e9b8d455ab0d3eb1c2845242d7ab26cea387f46fc00eb86b07d979a9"
+        anchor:
+          type: object
+          nullable: true
+          description: Merkle anchor information (if available)
+          example: null
+        certificate_jws:
+          type: string
+          description: JWS certificate for offline verification
+          example: "eyJhbGciOiJFZERTQSIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJkZWNpc2lvbiI6IlBBU1MiLCJpbnB1dHMiOnsiYW1vdW50IjoxNTAwLjAsImNvdW50cnkiOiJVUyIsInJlY2VudCI6Mn0sImtlcm5lbF9pZCI6IktfZGVtb192MV8yNzUwX2FsbG93bGlzdCIsIm9ibGlnYXRpb25zIjpbInByaXZhY3lfb2siLCJidWRnZXRfb2siXSwicGFyYW1faGFzaCI6ImMwNThjMWFhNTliYWNkNmU2YmJmODAzMGUxZmI1N2UyIiwicHJvb2ZfaWQiOiI3ZDMzZjU2MmU5YjhkNDU1YWIwZDNlYjFjMjg0NTI0MmQ3YWIyNmNlYTM4N2Y0NmZjMDBlYjg2YjA3ZDk3OWE5Iiwic3ViIjoiZGVjaXNpb24iLCJ0cyI6IjIwMjUtMDktMTdUMDQ6MTM6MzguMjEyNTc1WiJ9.C7vdoc0s-sJbeBa3dYDr8HxLH01IJjE9Gpbut5mm5lU4VCdZ-6vG9KefpNxBPpeRPTQ5--7CK01uimviwxctDQ"
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid input data"
+        details:
+          type: string
+          description: Additional error details
+          example: "Amount must be positive"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Decisions
+    description: Decision making operations
+  - name: Health
+    description: Health check operations

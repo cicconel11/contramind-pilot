@@ -31,7 +31,7 @@ services:
     container_name: cm-attestor
     environment:
       ATTESTOR_KEYS: "ed25519:v1:demo-seed-change-me;ed25519:v2:next-rotating-seed"
-      ATTESTOR_ACTIVE_KID: "ed25519:v1"
+      ATTESTOR_ACTIVE_KID: "v1"
     ports:
       - "8082:8080"
     healthcheck:
@@ -81,12 +81,22 @@ services:
     container_name: cm-prometheus
     volumes:
       - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/recording_rules.yml:/etc/prometheus/recording_rules.yml:ro
+      - ./ops/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
     ports:
       - "9090:9090"
     depends_on:
       - worldcheck
       - attestor
       - control
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: cm-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./ops/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
 
   grafana:
     image: grafana/grafana
@@ -112,3 +122,86 @@ services:
       PGDATABASE: cm
       PGPORT: "5432"
       ATTESTOR_URL: "http://attestor:8080"
+
+  # mTLS proxies
+  attestor-proxy:
+    image: caddy:2
+    container_name: cm-attestor-proxy
+    depends_on: [attestor]
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./ops/certs:/certs:ro
+
+  worldcheck-proxy:
+    image: caddy:2
+    container_name: cm-worldcheck-proxy
+    depends_on: [worldcheck]
+    ports:
+      - "8444:8444"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./ops/certs:/certs:ro
+
+  control-proxy:
+    image: caddy:2
+    container_name: cm-control-proxy
+    depends_on: [control]
+    ports:
+      - "8445:8445"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./ops/certs:/certs:ro
+
+  decider:
+    build: ./services/decider
+    container_name: cm-decider
+    depends_on:
+      - postgres
+      - attestor
+      - worldcheck
+    environment:
+      PGHOST: postgres
+      PGUSER: cm
+      PGPASSWORD: cm
+      PGDATABASE: cm
+      PGPORT: "5432"
+      ATTESTOR_URL: "http://attestor:8080"
+      WORLDCHECK_URL: "http://worldcheck:8080"
+    ports:
+      - "8084:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backups:
+    image: alpine:3.20
+    container_name: cm-backups
+    volumes:
+      - ./ops:/ops
+    command: ["sh","-lc","echo '0 2 * * * /ops/backup.sh' | crontab - && crond -f -L /dev/stdout"]
+    depends_on: [postgres]
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: cm-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: cm-promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./ops/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on: [loki]
+
+volumes:
+  loki-data:

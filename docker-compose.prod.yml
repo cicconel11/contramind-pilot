@@ -1,0 +1,28 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    command: ["postgres", "-c", "password_encryption=scram-sha-256"]
+    ports: []   # no host exposure in prod; use an internal LB
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cm -d cm"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  attestor:
+    environment:
+      ATTESTOR_KEYS: ${ATTESTOR_KEYS:?set in .env}
+      ATTESTOR_ACTIVE_KID: ${ATTESTOR_ACTIVE_KID:?set in .env}
+    restart: unless-stopped
+
+  control:
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set in .env}
+    restart: unless-stopped
+
+volumes:
+  pgdata:

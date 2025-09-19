@@ -1,4 +1,5 @@
 import os, json, base64, hashlib, time
+import orjson
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from nacl import signing, exceptions
@@ -74,3 +75,45 @@ def verify(req: VerifyReq):
         return {"valid": True, "kid": kid}
     except exceptions.BadSignatureError:
         return {"valid": False, "kid": kid}
+
+# --- JWS helpers (EdDSA over Ed25519) ---
+B64URL = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=")
+
+def jws_compact_sign(payload: dict, signing_key: signing.SigningKey, kid: str) -> str:
+    header = {"alg": "EdDSA", "kid": kid, "typ": "JWT"}
+    protected = B64URL(orjson.dumps(header, option=orjson.OPT_SORT_KEYS))
+    pl = B64URL(orjson.dumps(payload, option=orjson.OPT_SORT_KEYS))
+    signing_input = protected + b"." + pl
+    sig = signing_key.sign(signing_input).signature
+    return f"{protected.decode()}.{pl.decode()}.{B64URL(sig).decode()}"
+
+@app.post("/sign_jws")
+def sign_jws(body: dict):
+    payload = body.get("payload")
+    if payload is None:
+        raise HTTPException(status_code=400, detail="payload required")
+    # use active kid/key from existing key management
+    kid = ACTIVE_KID
+    sk = KEYRING[kid]["sk"]  # type: signing.SigningKey
+    jws = jws_compact_sign(payload, sk, kid)
+    return {"kid": kid, "jws": jws}
+
+@app.post("/verify_jws")
+def verify_jws(body: dict):
+    jws = body.get("jws")
+    if not jws or jws.count(".") != 2:
+        raise HTTPException(status_code=400, detail="invalid jws")
+    h, p, s = jws.split(".")
+    header = orjson.loads(base64.urlsafe_b64decode(h + "=="))
+    kid = header.get("kid")
+    if kid not in KEYRING:
+        raise HTTPException(status_code=400, detail="unknown kid")
+    vk = KEYRING[kid]["vk"]  # type: signing.VerifyKey
+    signing_input = (h + "." + p).encode()
+    sig = base64.urlsafe_b64decode(s + "==")
+    try:
+        vk.verify(signing_input, sig)
+        payload = orjson.loads(base64.urlsafe_b64decode(p + "=="))
+        return {"valid": True, "kid": kid, "payload": payload}
+    except Exception:
+        return {"valid": False}

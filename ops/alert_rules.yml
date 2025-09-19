@@ -1,0 +1,95 @@
+# ops/alert_rules.yml
+groups:
+- name: contramind-alerts
+  rules:
+  # SLO: 99.9% => error budget 0.1%
+  - alert: AttestorSignAvailabilityBudgetBurnFast
+    expr: (1 - slo:availability:attestor_sign) > 0.0144   # 14.4x burn over 30m
+    for: 30m
+    labels: {severity: page}
+    annotations:
+      summary: "Attestor /sign fast burn - availability budget burning fast"
+      description: "Attestor /sign availability is {{ $value | humanizePercentage }} (target: 99.9%)"
+      
+  - alert: AttestorSignAvailabilityBudgetBurnSlow
+    expr: (1 - slo:availability:attestor_sign) > 0.005     # ~5x over 6h
+    for: 6h
+    labels: {severity: ticket}
+    annotations:
+      summary: "Attestor /sign slow burn - availability budget burning slowly"
+      description: "Attestor /sign availability is {{ $value | humanizePercentage }} (target: 99.9%)"
+
+  - alert: AttestorVerifyAvailabilityBudgetBurnFast
+    expr: (1 - slo:availability:attestor_verify) > 0.0144
+    for: 30m
+    labels: {severity: page}
+    annotations:
+      summary: "Attestor /verify fast burn - availability budget burning fast"
+      description: "Attestor /verify availability is {{ $value | humanizePercentage }} (target: 99.9%)"
+
+  - alert: WorldCheckVerifyAvailabilityBudgetBurnFast
+    expr: (1 - slo:availability:worldcheck_verify) > 0.0144
+    for: 30m
+    labels: {severity: page}
+    annotations:
+      summary: "WorldCheck /verify fast burn - availability budget burning fast"
+      description: "WorldCheck /verify availability is {{ $value | humanizePercentage }} (target: 99.9%)"
+
+  - alert: ControlParamsAvailabilityBudgetBurnFast
+    expr: (1 - slo:availability:control_params) > 0.0144
+    for: 30m
+    labels: {severity: page}
+    annotations:
+      summary: "Control /param/* fast burn - availability budget burning fast"
+      description: "Control /param/* availability is {{ $value | humanizePercentage }} (target: 99.9%)"
+
+  # Latency SLO: p95 < 1.5s
+  - alert: AttestorSignLatencyP95High
+    expr: slo:latency_p95:attestor_sign > 1.5
+    for: 10m
+    labels: {severity: ticket}
+    annotations:
+      summary: "Attestor /sign p95 latency > 1.5s"
+      description: "Attestor /sign p95 latency is {{ $value }}s (target: < 1.5s)"
+
+  - alert: AttestorVerifyLatencyP95High
+    expr: slo:latency_p95:attestor_verify > 1.5
+    for: 10m
+    labels: {severity: ticket}
+    annotations:
+      summary: "Attestor /verify p95 latency > 1.5s"
+      description: "Attestor /verify p95 latency is {{ $value }}s (target: < 1.5s)"
+
+  - alert: WorldCheckVerifyLatencyP95High
+    expr: slo:latency_p95:worldcheck_verify > 1.5
+    for: 10m
+    labels: {severity: ticket}
+    annotations:
+      summary: "WorldCheck /verify p95 latency > 1.5s"
+      description: "WorldCheck /verify p95 latency is {{ $value }}s (target: < 1.5s)"
+
+  - alert: ControlParamsLatencyP95High
+    expr: slo:latency_p95:control_params > 1.5
+    for: 10m
+    labels: {severity: ticket}
+    annotations:
+      summary: "Control /param/* p95 latency > 1.5s"
+      description: "Control /param/* p95 latency is {{ $value }}s (target: < 1.5s)"
+
+  # Integrity SLO: signature verification failure rate < 0.1%
+  - alert: SignatureVerificationFailureRateHigh
+    expr: slo:integrity:signature_verification_failures > 0.001
+    for: 5m
+    labels: {severity: page}
+    annotations:
+      summary: "Signature verification failure rate > 0.1%"
+      description: "Signature verification failure rate is {{ $value | humanizePercentage }} (target: < 0.1%)"
+
+  # Service down alerts
+  - alert: ServiceDown
+    expr: up{job=~"attestor|worldcheck|control"} == 0
+    for: 1m
+    labels: {severity: page}
+    annotations:
+      summary: "Service {{ $labels.job }} is down"
+      description: "Service {{ $labels.job }} has been down for more than 1 minute"

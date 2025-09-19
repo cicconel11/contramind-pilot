@@ -1,0 +1,24 @@
+services:
+  refund-orchestrator:
+    build: .
+    environment:
+      DECIDER_URL: "http://decider:8084"   # adjust per your stack
+      ATTESTOR_KEYS_URL: "http://attestor-proxy:8443/keys" # if using mTLS proxies
+      VERIFY_TLS: "0"
+      DEFAULT_COUNTRY: "US"
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY}"
+      ADYEN_API_KEY: "${ADYEN_API_KEY}"
+      ADYEN_MERCHANT: "${ADYEN_MERCHANT}"
+      ADYEN_BASE_URL: "${ADYEN_BASE_URL}"
+      BT_ENV: "sandbox"
+      BT_MERCHANT_ID: "${BT_MERCHANT_ID}"
+      BT_PUBLIC_KEY: "${BT_PUBLIC_KEY}"
+      BT_PRIVATE_KEY: "${BT_PRIVATE_KEY}"
+      SHOPIFY_SHOP: "${SHOPIFY_SHOP}"
+      SHOPIFY_TOKEN: "${SHOPIFY_TOKEN}"
+      SHOPIFY_API_VERSION: "2024-07"
+    ports:
+      - "8085:8085"
+    depends_on:
+      - decider
+      - attestor-proxy

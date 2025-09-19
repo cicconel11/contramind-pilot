@@ -1,0 +1,32 @@
+# mTLS proxy for attestor service
+:8443 {
+  tls /certs/attestor.crt /certs/attestor.key {
+    client_auth {
+      mode require_and_verify
+      trusted_ca_cert_file /certs/ca.crt
+    }
+  }
+  reverse_proxy attestor:8080
+}
+
+# mTLS proxy for worldcheck service
+:8444 {
+  tls /certs/worldcheck.crt /certs/worldcheck.key {
+    client_auth {
+      mode require_and_verify
+      trusted_ca_cert_file /certs/ca.crt
+    }
+  }
+  reverse_proxy worldcheck:8080
+}
+
+# mTLS proxy for control service
+:8445 {
+  tls /certs/control.crt /certs/control.key {
+    client_auth {
+      mode require_and_verify
+      trusted_ca_cert_file /certs/ca.crt
+    }
+  }
+  reverse_proxy control:8080
+}
